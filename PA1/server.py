@@ -14,7 +14,8 @@ users = {}
 def get_hi(client_socket):
     response = b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 16\r\nAccess-Control-Allow-Origin: *\r\n\r\n{"message":"hi"}'
     client_socket.send(response)
-    print("{} was sent!".format(response))
+    print("========= sent_msg   ==========")
+    print(response)
 
 def post_echo(client_socket,msg_body_dict):
     try:
@@ -43,7 +44,8 @@ def post_echo(client_socket,msg_body_dict):
     response = bytes(response, encoding='utf-8')
     
     client_socket.send(response)
-    print("{} was sent!".format(response))
+    print("========= sent_msg   ==========")
+    print(response)
 
 def post_user(client_socket,msg_body_dict):
     try:
@@ -54,6 +56,8 @@ def post_user(client_socket,msg_body_dict):
         # 400
         response = b'HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
         client_socket.send(response)
+        print("========= sent_msg   ==========")
+        print(response)
         return
     # id가 존재하지 않는 경우등록
     if id not in users.keys():
@@ -65,16 +69,12 @@ def post_user(client_socket,msg_body_dict):
     else:
         response = b'HTTP/1.1 409 Registered id\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
     client_socket.send(response)
+    print("========= sent_msg   ==========")
+    print(response)
 
 def get_user(client_socket,query):
     id = query[1]
-    assert id in users
-    # try:
-    #     user_info = users[id]
-    # except KeyError:
-    #     # 등록되지 않은 id : 404
-    #     response = b'HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
-    #     return
+    assert id in users.keys()
     
     user_info = users[id]
     name = user_info[0]
@@ -101,13 +101,35 @@ def get_user(client_socket,query):
     response = bytes(response, encoding='utf-8')
     
     client_socket.send(response)
-    print("{} was sent!".format(response))
+    print("========= sent_msg   ==========")
+    print(response)
 
+def options_user(client_socket):
+    response = b'HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\nAccept: */*\r\nAccess-Control-Request-Headers: content-type\r\nAccess-Control-Max-Age: 86400\r\n\r\n'
+    
+    client_socket.send(response)
+    print("========= sent_msg   ==========")
+    print(response)
 
-def page_not_found(client_socket):
-    response = b'HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
+def delete_user(client_socket,user_id):
+    del(users[user_id])
+    response = b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n\r\n'
 
     client_socket.send(response)
+    print("========= sent_msg   ==========")
+    print(response)
+
+def page_not_found(client_socket):
+    response = b'HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n\r\n'
+
+    client_socket.send(response)
+
+def null_response(client_socket):
+    response = b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
+    
+    client_socket.send(response)
+    print("========= sent_msg   ==========")
+    print(response)
 
 # 서버 소켓 설정
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -123,7 +145,12 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.settimeout(None)
         msg = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
         # print(client_addr)                # ('127.0.0.1', 54029)
+        print("===============================")
+        print("========= raw_msg    ==========")
         print(msg)                        # raw message : binary
+        if msg==b'': 
+            print("message length is too small. So, ignored.")
+            continue
         
         # msg & decode
         decode_msg = msg.decode()
@@ -154,6 +181,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         
         # client info
         split_msg = decode_msg.split()
+        
         method = split_msg[0]
         parmalink = split_msg[1]
         host = split_msg[4]
@@ -168,6 +196,16 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         if len(split_query)>1:
             parmalink = split_query[0]
             query = split_query[1].split('=') # ["id","chp"]
+        
+        user_id = parmalink.split('/')
+
+        if len(user_id)>2:
+            if user_id[-1] in users.keys():
+                parmalink = '/' + user_id[1]
+                user_id = user_id[-1]
+            else:
+                user_id = None
+                
 
         parmalinks = {'/hi','/echo','/user'}
         if parmalink not in parmalinks: 
@@ -180,10 +218,16 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         elif parmalink=='/user' and method=='POST':
             post_user(client_socket,msg_body_dict)
         elif parmalink=='/user' and method=='GET':
-            if query[1] not in users:
+            if query[1] not in users.keys():
                 page_not_found(client_socket)
             else:
                 get_user(client_socket,query)
+        elif parmalink=='/user' and method=='OPTIONS':
+            assert user_id is not None
+            options_user(client_socket)
+        elif parmalink=='/user' and method=='DELETE':
+            assert user_id is not None
+            delete_user(client_socket,user_id)
         
 
         # 클라이언트에게 응답
