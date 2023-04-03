@@ -14,6 +14,35 @@ def hi(client_socket):
     client_socket.send(response)
     print("{} was sent!".format(response))
 
+def echo(client_socket,msg_body_dict):
+    try:
+        m = msg_body_dict["message"]
+    except:
+        m = None
+    
+    # make body
+    body = {"message":m}
+    body = json.dumps(body)
+    leng = len(body)
+
+    # make header
+    headers = []
+    headers.append('HTTP/1.1 200 OK')
+    headers.append('Content-Type: application/json')
+    headers.append('Content-Length: {}'.format(leng))
+    headers.append('Access-Control-Allow-Origin: *')
+    header = ''
+    for h in headers:
+        header += h
+        header += '\r\n'
+    header += '\r\n'
+
+    response = header + body
+    response = bytes(response, encoding='utf-8')
+    
+    client_socket.send(response)
+    print("{} was sent!".format(response))
+
 # 서버 소켓 설정
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
     server_socket.bind(ADDR)  # 주소 바인딩
@@ -39,7 +68,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         # print(decode_msg.split()) 
         # print(type(decode_msg.split()))   # list
 
-        ''' decode_msg.split()
+        '''Q1 : decode_msg.split() 
         ['GET', '/hi', 'HTTP/1.1', 
         'Host:', 'localhost:1398', 
         'Connection:', 'keep-alive', 
@@ -62,10 +91,16 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         method = split_msg[0]
         parmalink = split_msg[1]
         host = split_msg[4]
+        msg_body = split_msg[-1]        # if data exists, get 'json string', type : str
+        try:
+            msg_body_dict = json.loads(msg_body)
+        except:
+            msg_body_dict = {}
 
         if method=='GET' and parmalink=='/hi':
             hi(client_socket)
-        
+        elif method=='POST' and parmalink=='/echo':
+            echo(client_socket,msg_body_dict)        
 
         # 클라이언트에게 응답
         # client_socket.sendall("welcome!".encode())
