@@ -9,6 +9,10 @@ PORT = 1398
 SIZE = 1024
 ADDR = (IP, PORT)
 
+def hi(client_socket):
+    response = b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 16\r\nAccess-Control-Allow-Origin: *\r\n\r\n{"message":"hi"}'
+    client_socket.send(response)
+    print("{} was sent!".format(response))
 
 # 서버 소켓 설정
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -23,6 +27,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
             continue
         server_socket.settimeout(None)
         msg = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
+        # print(client_addr)                # ('127.0.0.1', 54029)
+        print(msg)                        # raw message : binary
         
         # msg & decode
         decode_msg = msg.decode()
@@ -51,12 +57,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         'Accept-Language:', 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7']
         '''
         
+        # client info
+        split_msg = decode_msg.split()
+        method = split_msg[0]
+        parmalink = split_msg[1]
+        host = split_msg[4]
 
-        # print(client_addr)    # client address ('127.0.0.1', 54029)
-        # print(msg)            # raw message
+        if method=='GET' and parmalink=='/hi':
+            hi(client_socket)
+        
 
         # 클라이언트에게 응답
-        client_socket.sendall("welcome!".encode())
+        # client_socket.sendall("welcome!".encode())
 
         # 클라이언트 소켓 종료  
         client_socket.close()  
