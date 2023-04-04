@@ -55,6 +55,7 @@ def post_user(client_socket,msg_body_dict):
     except KeyError:
         # 400
         response = b'HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
+        # response = b'HTTP/1.1 400 Bad Request\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
         client_socket.send(response)
         print("========= sent_msg   ==========")
         print(response)
@@ -64,10 +65,12 @@ def post_user(client_socket,msg_body_dict):
         users[id]=(name,gender)
         # 201
         response = b'HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
+        # response = b'HTTP/1.1 201 Created\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
 
     # 기존에 등록된 id : 409
     else:
         response = b'HTTP/1.1 409 Registered id\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
+        # response = b'HTTP/1.1 409 Registered id\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
     client_socket.send(response)
     print("========= sent_msg   ==========")
     print(response)
@@ -105,7 +108,28 @@ def get_user(client_socket,query):
     print(response)
 
 def options_user(client_socket):
-    response = b'HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\nAccept: */*\r\nAccess-Control-Request-Headers: content-type\r\nAccess-Control-Max-Age: 86400\r\n\r\n'
+    # make header
+    headers = []
+    headers.append('HTTP/1.1 200 OK')
+    # headers.append('Connection: keep-alive')
+    headers.append('Access-Control-Allow-Origin: *')
+    headers.append('Access-Control-Allow-Headers: *')
+    headers.append('Access-Control-Allow-Methods: POST, GET, OPTIONS, DELETE, PUT')
+    headers.append('Access-Control-Max-Age: 86400')
+    header = ''
+    for h in headers:
+        header += h
+        header += '\r\n'
+    header += '\r\n'
+
+    # make body
+    body = ''
+
+    response = header + body
+    response = bytes(response, encoding='utf-8')
+
+    # single response
+    # response = b'HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\nAccess-Control-Request-Headers: *\r\n\r\n'
     
     client_socket.send(response)
     print("========= sent_msg   ==========")
@@ -114,10 +138,36 @@ def options_user(client_socket):
 def delete_user(client_socket,user_id):
     del(users[user_id])
     response = b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n\r\n'
-
+    
     client_socket.send(response)
     print("========= sent_msg   ==========")
     print(response)
+
+def put_user(client_socket,msg_body_dict,user_id):
+    id = user_id
+    try:
+        name = msg_body_dict["name"]
+    except KeyError:
+        # 400, 요청 무시
+        response = b'HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
+        client_socket.send(response)
+        return
+    if "id" in msg_body_dict.keys() or "gender" in msg_body_dict.keys():
+        # 400, 요청 무시
+        response = b'HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
+        client_socket.send(response)
+        return
+    user_info = users[id]
+    if name==user_info[0]:
+        # 기존에 등록된 name과 동일 : 요청 무시, 422
+        response = b'HTTP/1.1 422 Unprocessable Entity\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n'
+    else:
+        # 수정 진행
+        new_user_info = (name,user_info[1])
+        users[id]=new_user_info
+        # 200
+        response = b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n\r\n'
+    client_socket.send(response)
 
 def page_not_found(client_socket):
     response = b'HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n\r\n'
@@ -205,7 +255,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
                 user_id = user_id[-1]
             else:
                 user_id = None
-                
+        
+        # Preflight은 무조건 응답
+        if method=='OPTIONS':
+            options_user(client_socket)
+            continue
 
         parmalinks = {'/hi','/echo','/user'}
         if parmalink not in parmalinks: 
@@ -228,6 +282,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         elif parmalink=='/user' and method=='DELETE':
             assert user_id is not None
             delete_user(client_socket,user_id)
+        elif parmalink=='/user' and method=='PUT':
+            assert user_id is not None
+            put_user(client_socket,msg_body_dict,user_id)
         
 
         # 클라이언트에게 응답
