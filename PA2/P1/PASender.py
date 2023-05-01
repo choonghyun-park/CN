@@ -1,7 +1,7 @@
 import random
 import socket
 import json
-
+from logHandler import *
 
 class PASender:
     loss_rate = 0.0
@@ -11,7 +11,7 @@ class PASender:
     def __init__(self, soc, config_file=None, loss_rate=-1.0, corrupt_rate=-1.0, bit_error_rate=-1.0):
         self.soc = soc
         self.bit_error_rate = 0.1
-        if config_file:
+        if config_file: # config.txt 에서 값을 가져오는 경우
             with open(config_file) as json_file:
                 config_data = json.load(json_file)
                 if "loss_rate" in config_data:
@@ -20,7 +20,7 @@ class PASender:
                     self.corrupt_rate = config_data["corrupt_rate"]
                 if "bit_error_rate" in config_data:
                     self.bit_error_rate = config_data["bit_error_rate"]
-        else:
+        else: # config.txt가 존재하지 않는 경우. 따로 매개변수를 넣어주지 않았으면 기본값을 사용한다.
             if 0 <= loss_rate <= 1:
                 self.loss_rate = loss_rate
             if 0 <= corrupt_rate <= 1:
@@ -75,3 +75,44 @@ sender = PASender(sock, config_file="testfile.txt")
 sender.sendto("packet_data", ("127.0.0.1", 10090)) 
 # or sender.sendto_bytes("packet_data".encode(), ("127.0.0.1", 10090))
 """
+
+if __name__=='__main__':
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # sender socket
+
+    sender = PASender(sock, config_file="config.txt") # sender class
+
+    # test sending. 아래 두 함수의 결과가 동일함.
+    # sender.sendto("packet_data", ("127.0.0.1", 10090)) 
+    # sender.sendto_bytes("packet_data".encode(), ("127.0.0.1", 10090))
+    
+    test_file = "test_file.txt"
+    BUFFER_SIZE = 1024
+    PACKET_SIZE = BUFFER_SIZE-1 # packet_size는 최대 buffer_size-1 이다. 
+
+    logger = logHandler()
+    logger.startLogging("log_sender.txt")
+
+
+    with open(test_file) as file:
+        line = file.readline()
+        SIZE = len(line)
+        
+        iterates = SIZE//PACKET_SIZE
+        if SIZE%PACKET_SIZE!=0:
+            iterates+=1
+        
+        for i in range(iterates):
+            packet = line[i*PACKET_SIZE:(i+1)*PACKET_SIZE]
+            assert len(packet)<BUFFER_SIZE
+            # sender.sendto(packet, ("127.0.0.1", 10090)) # send to dst ("127.0.0.1", 10090)
+            
+            sender.sendto_bytes(packet.encode(), ("127.0.0.1", 10090))
+            logger.writePkt(i,"Send DATA")
+
+    logger.writeEnd()
+
+
+
+
+    
+
