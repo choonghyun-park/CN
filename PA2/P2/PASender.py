@@ -78,10 +78,12 @@ sender.sendto("packet_data", ("127.0.0.1", 10090))
 """
 
 def cal_checksum(data):
-    bin_data_str = ''.join(format(ord(i), '08b') for i in data)  # 문자열을 이진(binary)으로 변환
-    bin_data = int(bin_data_str,2)
-    checksum = ~bin_data
-    checksum = '{0:b}'.format(checksum).zfill(32) # 32 자리로 맞추기. 남는자리에 0을 넣어줌.
+    checksum = int(data,16) # 8bit str
+    checksum = ~checksum
+    # bin_data_str = ''.join(format(ord(i), '08b') for i in data)  # 문자열을 이진(binary)으로 변환
+    # bin_data = int(bin_data_str,2)
+    # checksum = ~bin_data
+    # checksum = '{0:b}'.format(checksum).zfill(32) # 32 자리로 맞추기. 남는자리에 0을 넣어줌.
     
     return checksum
 
@@ -137,6 +139,16 @@ def make_msg(data,seq,checksum):
 
 
 if __name__=='__main__':
+    '''
+    checksum : 16-bit(=2B) 보수 계산
+    buffer_size = 1024B
+    data_size = bf/4 = 256B
+
+
+
+
+    
+    '''
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # sender socket
 
     sender = PASender(sock, config_file="config.txt") # sender class
@@ -146,8 +158,8 @@ if __name__=='__main__':
     # sender.sendto_bytes("packet_data".encode(), ("127.0.0.1", 10090))
     
     test_file = "test_file.txt"
-    BUFFER_SIZE = 1024 # 1KB = 1024B = 1024 * 8bit
-    DATA_SIZE = 4 # 4B 로 그냥 정했음.
+    BUFFER_SIZE = 2 * 1024 # 1KB = 1024B = 1024 * 8bit
+    DATA_SIZE = BUFFER_SIZE//4 # 그냥 정했음.
     # DATA_SIZE = int(BUFFER_SIZE/2-1) # packet_size는 최대 buffer_size-1 이다. 안전하게 (buffer의 절반 -1) 크기로 보낸다.
 
     logger = logHandler()
@@ -191,6 +203,8 @@ if __name__=='__main__':
         seqs = (0,1)
         checksum = None
         for i,data in enumerate(datas):
+            if i%10==0:
+                print("Sending [{}/{}] data...".format(i+1,len(datas)))
             # packet 만들기
             seq = seqs[i%2] # 0,1 을 번갈아가며 보내주기.
             checksum = cal_checksum(data) 

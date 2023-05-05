@@ -5,15 +5,18 @@ from logHandler import *
 # 통신 정보 설정
 IP = '127.0.0.1'
 PORT = 10090
-SIZE = 1024
+# SIZE = 1024
+SIZE = 2 * 1024
 ADDR = (IP, PORT)
 
 
 def cal_checksum(data):
-    bin_data_str = ''.join(format(ord(i), '08b') for i in data)  # 문자열을 이진(binary)으로 변환
-    bin_data = int(bin_data_str,2)
-    checksum = ~bin_data
-    checksum = '{0:b}'.format(checksum).zfill(32) # 32 자리로 맞추기. 남는자리에 0을 넣어줌.
+    checksum = int(data,16) # 8bit str
+    checksum = ~checksum
+    # bin_data_str = ''.join(format(ord(i), '08b') for i in data)  # 문자열을 이진(binary)으로 변환.
+    # bin_data = int(bin_data_str,2)
+    # checksum = ~bin_data
+    # checksum = '{0:b}'.format(checksum).zfill(32) # 32 자리로 맞추기. 남는자리에 0을 넣어줌.
     
     return checksum
 
@@ -98,6 +101,10 @@ if __name__=='__main__':
                 body = split_data[-1]
                 body = json.loads(body)
                 data = body["data"]
+                cal_cs = str(cal_checksum(data))
+                # print("debug")
+                # print(type(checksum))
+                # print(type(cal_cs))
             except:
                 # Any Error occured in transmission : send NAK
                 packet = make_msg(other_seq[expected_seq])
@@ -107,22 +114,17 @@ if __name__=='__main__':
                 # print(packet)
                 continue
 
-
             # check seq and checksum
-            if seq==expected_seq and checksum==cal_checksum(data):
+            if seq==expected_seq and checksum==cal_cs:
                 expected_seq = other_seq[expected_seq]
                 packet = make_msg(seq) # 받은 seq를 ACK으로 보내줌.
                 logger.writeAck(seq,"Send ACK")
             else:
-                # send NAK
-                # print("NAK situation")
-                # print(seq==expected_seq)
-                # print(checksum==cal_checksum(data))
-                # print("expected_seq",expected_seq)
-                # print("seq",seq)
-                # print("checksum",checksum)
-                # print("cal_checksum(data)",cal_checksum(data))
-                # print("data",data)
+                # Send NAK
+                # print("seq",seq==expected_seq)
+                # print("cs",checksum==cal_cs)
+                # print("received cs",checksum)
+                # print("cal cs",cal_cs)
                 packet = make_msg(other_seq[expected_seq])
                 logger.writeAck(other_seq[expected_seq],"Send ACK Again")
 
@@ -131,6 +133,9 @@ if __name__=='__main__':
                 # 응답
                 datas.append(data)
                 server_socket.sendto(packet, addr)
+                idx = len(datas)
+                if idx%10==1:
+                    print("Sending {}th ACK...".format(idx))
                 # print("=========== Response ===========")
                 # print(packet)
             else:
