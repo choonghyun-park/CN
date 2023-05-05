@@ -77,7 +77,15 @@ sender.sendto("packet_data", ("127.0.0.1", 10090))
 # or sender.sendto_bytes("packet_data".encode(), ("127.0.0.1", 10090))
 """
 
-def cal_checksum(data1,data2):
+def cal_checksum(data):
+    bin_data_str = ''.join(format(ord(i), '08b') for i in data)  # 문자열을 이진(binary)으로 변환
+    bin_data = int(bin_data_str,2)
+    checksum = ~bin_data
+    checksum = '{0:b}'.format(checksum).zfill(32) # 32 자리로 맞추기. 남는자리에 0을 넣어줌.
+    
+    return checksum
+
+def cal_checksum2(data1,data2):
     if data2 is None:
         bin_data1 = ''.join(format(ord(i), '08b') for i in data1)  # 문자열을 이진(binary)으로 변환
         bin_data1 = '0b'+bin_data1
@@ -148,7 +156,6 @@ if __name__=='__main__':
     seq = 0
 
     with open(test_file) as file:
-        line = file.readline()
 
         '''
         udp segment
@@ -160,60 +167,78 @@ if __name__=='__main__':
         body
             - data
 
-        여기서 ACK(seq)만 있으면 필요한 건 다 들어간 거임. ACK은 TCP segment에 존재하는 것인데, UDP의 Body와 header 중 어디에 넣어야 할지 좀 애매하긴 하다.
-        넣는다면 header가 맞긴 할듯. 
-
-        
-        [client]
-        data, addr = server_socket.recvfrom(SIZE)
-        '''    
-
-        
-        '''
-        전체 데이터를 나눠서 보낼껀데, 데이터 크기를 얼마로 잡을지가 문제이다.
-        [고려사항]
-        header 크기
-        buffer size : buffer size보다 1만큼 작게만 보내면 되는 줄 알았는데, 가끔 버퍼 오버플로우가 발생한다. 
-                    원인이 명확하지 않다. 아마 header의 크기가 조금이라도 생겨서 그럴 것 같기는 하다.
-
-        
+        * 보내는 msg에 header와 body 파트로 나눠서 보내기로 했다. 
+        * length는 일단 필요없어서 안만들었다. 가변성이 너무 크기도 하고..
+        * checksum은 일단, 데이터 하나 기준으로 계산한다. 즉, 보수만 취하고 남는 자리에 0을 채워서 보낸다.
+        * ack은 다음 받아야 할 seq가 아니라, seq를 그대로 다시 응답으로 실어서 보내준다.
         '''
         
+        line = file.readline()
         datas = []
-        SIZE = len(line)
+        FILE_SIZE = len(line)
 
-        iterates = SIZE//DATA_SIZE
-        if SIZE%DATA_SIZE!=0:
+        iterates = FILE_SIZE//DATA_SIZE
+        if FILE_SIZE%DATA_SIZE!=0:
             iterates+=1
         
         for i in range(iterates):
             data = line[i*DATA_SIZE:(i+1)*DATA_SIZE] # 4B
             datas.append(data)
-
+        datas.append("finish")
 
         # checksum을 반드시 모든 데이터에 대해서 수행할 필요는 없어보인다.
         # seq의 주기를 따르는 것이 옳다고 본다.
         seqs = (0,1)
         checksum = None
         for i,data in enumerate(datas):
-            # 0,1 을 번갈아가며 보내주기.
-            seq = seqs[i%2]
-            
-            if i%2==0:
-                # 짝수 idx + 마지막 자리 
-                if i==len(datas)-1:
-                    checksum = cal_checksum(datas[i],None)
-                else:
-                    checksum = cal_checksum(datas[i],datas[i+1])
-
-            # checksum 기록
+            # packet 만들기
+            seq = seqs[i%2] # 0,1 을 번갈아가며 보내주기.
+            checksum = cal_checksum(data) 
             packet = make_msg(data,seq,checksum)
-            
-            sender.sendto(packet, ("127.0.0.1", 10090)) # send to dst ("127.0.0.1", 10090)
-            print(packet)
-            print()
-            # sender.sendto_bytes(packet.encode(), ("127.0.0.1", 10090))
-            logger.writePkt(i,"Send DATA")
+
+            send_flag = True     
+            resend_flag = False       
+
+            # Receive Response
+            while True:
+                if send_flag or resend_flag:
+                    sender.sendto(packet, ("127.0.0.1", 10090)) # send to dst ("127.0.0.1", 10090)
+                    # sender.sendto_bytes(packet.encode(), ("127.0.0.1", 10090))
+                    if send_flag:
+                        logger.writePkt(i,"Send DATA")
+                        send_flag = False
+                    elif resend_flag:
+                        logger.writePkt(i,"Send DATA Again")
+                        resend_flag = False
+                    # print("========= Send Packet =========")
+                    # print(packet)
+
+                sock.settimeout(1)
+                try:
+                    response, addr = sock.recvfrom(1024)
+                except socket.timeout:  
+                    logger.writeTimeout(seq)
+                    # print("Timeout!!")
+                    resend_flag = True
+                    continue
+                except OSError:
+                    print("Buffer overflow!!")
+                    continue
+
+                decode_response = response.decode()
+                split_data = decode_response.split()
+                # decoded data
+                # print("========= decode response ==========")
+                # print(decode_response)
+
+                # extract ack
+                ack = int(split_data[1])
+                if ack==seqs[i%2]:
+                    logger.writePkt(i,"Sent Successfully")
+                    break
+                else:
+                    logger.writePkt(i,"Wrong Sequence Number")
+                    resend_flag=True
 
     logger.writeEnd()
 
