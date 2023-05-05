@@ -166,23 +166,6 @@ if __name__=='__main__':
     seq = 0
 
     with open(test_file) as file:
-
-        '''
-        udp segment
-        header
-            - source port
-            - dest port
-            - length
-            - checksum
-        body
-            - data
-
-        * 보내는 msg에 header와 body 파트로 나눠서 보내기로 했다. 
-        * length는 일단 필요없어서 안만들었다. 가변성이 너무 크기도 하고..
-        * checksum은 일단, 데이터 하나 기준으로 계산한다. 즉, 보수만 취하고 남는 자리에 0을 채워서 보낸다.
-        * ack은 다음 받아야 할 seq가 아니라, seq를 그대로 다시 응답으로 실어서 보내준다.
-        '''
-        
         line = file.readline()
         datas = []
         FILE_SIZE = len(line)
@@ -192,16 +175,14 @@ if __name__=='__main__':
             iterates+=1
         
         for i in range(iterates):
-            data = line[i*DATA_SIZE:(i+1)*DATA_SIZE] # 4B
+            data = line[i*DATA_SIZE:(i+1)*DATA_SIZE] 
             datas.append(data)
         datas.append("finish")
 
-        # checksum을 반드시 모든 데이터에 대해서 수행할 필요는 없어보인다.
-        # seq의 주기를 따르는 것이 옳다고 본다.
         seqs = (0,1)
         checksum = None
         for i,data in enumerate(datas):
-            if i%10==0:
+            if i%100==0:
                 print("Sending [{}/{}] data...".format(i+1,len(datas)))
             # packet 만들기
             seq = seqs[i%2] # 0,1 을 번갈아가며 보내주기.
@@ -223,12 +204,11 @@ if __name__=='__main__':
                         logger.writePkt(i,"Send DATA Again")
                         resend_flag = False
 
-                sock.settimeout(1)
+                sock.settimeout(0.01)
                 try:
                     response, addr = sock.recvfrom(1024)
                 except socket.timeout:  
                     logger.writeTimeout(seq)
-                    # print("Timeout!!")
                     resend_flag = True
                     continue
                 except OSError:

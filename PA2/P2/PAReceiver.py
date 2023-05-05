@@ -5,7 +5,6 @@ from logHandler import *
 # 통신 정보 설정
 IP = '127.0.0.1'
 PORT = 10090
-# SIZE = 1024
 SIZE = 2 * 1024
 ADDR = (IP, PORT)
 
@@ -81,11 +80,11 @@ if __name__=='__main__':
         server_socket.bind(ADDR) # 서버의 port, ip 주소 지정
         
         while True:
-            server_socket.settimeout(1)
+            # server_socket.settimeout(0.01) 
             try:
                 data, addr = server_socket.recvfrom(SIZE)
-            except socket.timeout:
-                continue
+            # except socket.timeout:
+            #     continue
             except OSError:
                 print("Buffer overflow!!")
                 continue

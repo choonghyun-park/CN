@@ -80,12 +80,8 @@ sender.sendto("packet_data", ("127.0.0.1", 10090))
 def cal_checksum(data):
     if data=='finish':
         return 0
-    checksum = int(data,16) # 8bit str
+    checksum = int(data,16) 
     checksum = ~checksum
-    # bin_data_str = ''.join(format(ord(i), '08b') for i in data)  # 문자열을 이진(binary)으로 변환
-    # bin_data = int(bin_data_str,2)
-    # checksum = ~bin_data
-    # checksum = '{0:b}'.format(checksum).zfill(32) # 32 자리로 맞추기. 남는자리에 0을 넣어줌.
     
     return checksum
 
@@ -121,11 +117,9 @@ def make_msg(data,seq,checksum):
     # make body
     body = {"data":data}
     body = json.dumps(body)
-    # length = len(body) # body와 header를 합쳐서 계산해야 하는데, 이게 까다로움
 
     # make header
     headers = []
-    # headers.append('length: {}'.format(length))
     headers.append('seq: {}'.format(seq))
     headers.append('checksum: {}'.format(checksum))
     header = ''
@@ -141,52 +135,19 @@ def make_msg(data,seq,checksum):
 
 
 if __name__=='__main__':
-    '''
-    checksum : 16-bit(=2B) 보수 계산
-    buffer_size = 1024B
-    data_size = bf/4 = 256B
-
-
-
-
-    
-    '''
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # sender socket
-
     sender = PASender(sock, config_file="config.txt") # sender class
 
-    # test sending. 아래 두 함수의 결과가 동일함.
-    # sender.sendto("packet_data", ("127.0.0.1", 10090)) 
-    # sender.sendto_bytes("packet_data".encode(), ("127.0.0.1", 10090))
-    
     test_file = "test_file.txt"
     BUFFER_SIZE = 2 * 1024 # 1KB = 1024B = 1024 * 8bit
-    DATA_SIZE = BUFFER_SIZE//4 # 그냥 정했음.
-    # DATA_SIZE = int(BUFFER_SIZE/2-1) # packet_size는 최대 buffer_size-1 이다. 안전하게 (buffer의 절반 -1) 크기로 보낸다.
+    DATA_SIZE = BUFFER_SIZE//4 # Buffer overflow가 발생하지 않는 선에서 적절한 값.
 
     logger = logHandler()
     logger.startLogging("log_sender.txt")
 
     seq = 0
 
-    with open(test_file) as file:
-
-        '''
-        udp segment
-        header
-            - source port
-            - dest port
-            - length
-            - checksum
-        body
-            - data
-
-        * 보내는 msg에 header와 body 파트로 나눠서 보내기로 했다. 
-        * length는 일단 필요없어서 안만들었다. 가변성이 너무 크기도 하고..
-        * checksum은 일단, 데이터 하나 기준으로 계산한다. 즉, 보수만 취하고 남는 자리에 0을 채워서 보낸다.
-        * ack은 다음 받아야 할 seq가 아니라, seq를 그대로 다시 응답으로 실어서 보내준다.
-        '''
-        
+    with open(test_file) as file:        
         line = file.readline()
         datas = []
         FILE_SIZE = len(line)
@@ -227,14 +188,8 @@ if __name__=='__main__':
                         logger.writePkt(i,"Send DATA Again")
                         resend_flag = False
 
-                sock.settimeout(1)
                 try:
                     response, addr = sock.recvfrom(1024)
-                except socket.timeout:  
-                    logger.writeTimeout(seq)
-                    # print("Timeout!!")
-                    resend_flag = True
-                    continue
                 except OSError:
                     print("Buffer overflow!!")
                     continue

@@ -124,7 +124,7 @@ if __name__=='__main__':
                 datas.append(data)
                 server_socket.sendto(packet, addr)
                 idx = len(datas)
-                if idx%10==1:
+                if idx%100==1:
                     print("Sending {}th ACK...".format(idx))
             else:
                 server_socket.sendto(packet, addr)
