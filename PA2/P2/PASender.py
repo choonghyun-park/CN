@@ -78,6 +78,8 @@ sender.sendto("packet_data", ("127.0.0.1", 10090))
 """
 
 def cal_checksum(data):
+    if data=='finish':
+        return 0
     checksum = int(data,16) # 8bit str
     checksum = ~checksum
     # bin_data_str = ''.join(format(ord(i), '08b') for i in data)  # 문자열을 이진(binary)으로 변환
@@ -224,8 +226,6 @@ if __name__=='__main__':
                     elif resend_flag:
                         logger.writePkt(i,"Send DATA Again")
                         resend_flag = False
-                    # print("========= Send Packet =========")
-                    # print(packet)
 
                 sock.settimeout(1)
                 try:
@@ -241,9 +241,6 @@ if __name__=='__main__':
 
                 decode_response = response.decode()
                 split_data = decode_response.split()
-                # decoded data
-                # print("========= decode response ==========")
-                # print(decode_response)
 
                 # extract ack
                 ack = int(split_data[1])

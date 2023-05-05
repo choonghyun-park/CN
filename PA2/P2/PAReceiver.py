@@ -11,6 +11,8 @@ ADDR = (IP, PORT)
 
 
 def cal_checksum(data):
+    if data=='finish':
+        return 0
     checksum = int(data,16) # 8bit str
     checksum = ~checksum
     # bin_data_str = ''.join(format(ord(i), '08b') for i in data)  # 문자열을 이진(binary)으로 변환.
@@ -90,9 +92,6 @@ if __name__=='__main__':
 
             decode_data = data.decode()
             split_data = decode_data.split('\r\n')
-            # decoded data
-            # print("========= decode data ==========")
-            # print(decode_data)
 
             # extract data
             try:
@@ -102,16 +101,11 @@ if __name__=='__main__':
                 body = json.loads(body)
                 data = body["data"]
                 cal_cs = str(cal_checksum(data))
-                # print("debug")
-                # print(type(checksum))
-                # print(type(cal_cs))
             except:
                 # Any Error occured in transmission : send NAK
                 packet = make_msg(other_seq[expected_seq])
                 server_socket.sendto(packet, addr)
                 logger.writeAck(seq,"DATA Corrupted")
-                # print("=========== Response ===========")
-                # print(packet)
                 continue
 
             # check seq and checksum
@@ -121,10 +115,6 @@ if __name__=='__main__':
                 logger.writeAck(seq,"Send ACK")
             else:
                 # Send NAK
-                # print("seq",seq==expected_seq)
-                # print("cs",checksum==cal_cs)
-                # print("received cs",checksum)
-                # print("cal cs",cal_cs)
                 packet = make_msg(other_seq[expected_seq])
                 logger.writeAck(other_seq[expected_seq],"Send ACK Again")
 
@@ -136,14 +126,8 @@ if __name__=='__main__':
                 idx = len(datas)
                 if idx%10==1:
                     print("Sending {}th ACK...".format(idx))
-                # print("=========== Response ===========")
-                # print(packet)
             else:
                 server_socket.sendto(packet, addr)
                 break
 
-            # print(decode_data)
-            # print()
-            # print("Sender IP",addr[0])
-            # print("Sender Port",addr[1])
         logger.writeEnd()
